@@ -8,6 +8,7 @@ import shutil
 
 CONFIG_FILE = "config.env"
 
+# Default fallback values if config.env is missing or incomplete
 DEFAULT_CONFIG = {
     "LOG_DIR": "./logs",
     "LOG_RETENTION_DAYS": "7",
@@ -17,8 +18,8 @@ DEFAULT_CONFIG = {
 
 def load_config(config_path: str) -> dict:
     """
-    Load simple KEY=VALUE config from config.env.
-    Falls back to DEFAULT_CONFIG if file is missing or keys are missing.
+    Load simple KEY=VALUE pairs from config.env.
+    If the file is missing or contains invalid entries, defaults are used.
     """
     config = DEFAULT_CONFIG.copy()
 
@@ -34,22 +35,25 @@ def load_config(config_path: str) -> dict:
                     continue
                 if "=" not in line:
                     continue
+
                 key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip().strip('"').strip("'")
+
                 if key in config:
                     config[key] = value
     except Exception as e:
-        print(f"[WARN] Failed to read config.env: {e}. Using defaults.")
+        print(f"[WARN] Could not read config.env: {e}. Using defaults.")
 
     return cast_config_types(config)
 
 
 def cast_config_types(config: dict) -> dict:
     """
-    Convert string values from config to correct Python types.
+    Convert config values from strings to the appropriate Python types.
     """
     cfg = config.copy()
+
     try:
         cfg["LOG_RETENTION_DAYS"] = int(cfg.get("LOG_RETENTION_DAYS", "7"))
     except ValueError:
@@ -60,14 +64,13 @@ def cast_config_types(config: dict) -> dict:
     except ValueError:
         cfg["TOP_PROCESSES_COUNT"] = 5
 
-    # LOG_DIR stays as string; we’ll convert to Path later
     return cfg
 
 
 def safe_run_shell(command: str) -> str:
     """
-    Run a shell command via bash -lc and return stdout as string.
-    Never raises, always returns something.
+    Run a command using bash -lc and return its output.
+    This never raises an exception; errors are returned as text.
     """
     try:
         result = subprocess.run(
@@ -77,18 +80,21 @@ def safe_run_shell(command: str) -> str:
             text=True,
             check=False,
         )
+
         out = (result.stdout or "").strip()
         if out:
             return out
+
         err = (result.stderr or "").strip()
         return err if err else ""
+
     except Exception as e:
         return f"[ERROR running '{command}']: {e}"
 
 
 def safe_run(cmd_list: list[str]) -> str:
     """
-    Run a command without shell and return stdout.
+    Run a command without using the shell and return its output safely.
     """
     try:
         result = subprocess.run(
@@ -98,11 +104,14 @@ def safe_run(cmd_list: list[str]) -> str:
             text=True,
             check=False,
         )
+
         out = (result.stdout or "").strip()
         if out:
             return out
+
         err = (result.stderr or "").strip()
         return err if err else ""
+
     except Exception as e:
         return f"[ERROR running '{' '.join(cmd_list)}']: {e}"
 
@@ -124,7 +133,7 @@ def collect_system_info(f) -> None:
     uptime = safe_run(["uptime", "-p"])
     kernel = safe_run(["uname", "-r"])
 
-    # Read OS name from /etc/os-release
+    # Try to detect OS name
     os_pretty = ""
     try:
         with open("/etc/os-release", "r", encoding="utf-8") as osr:
@@ -144,7 +153,7 @@ def collect_system_info(f) -> None:
 def collect_cpu_load(f, top_processes_count: int) -> None:
     log_section(f, "CPU & Load")
 
-    # /proc/loadavg holds load averages
+    # /proc/loadavg contains load averages
     try:
         with open("/proc/loadavg", "r", encoding="utf-8") as lp:
             loadavg = " ".join(lp.read().split()[:3])
@@ -160,16 +169,12 @@ def collect_cpu_load(f, top_processes_count: int) -> None:
 
 def collect_memory(f) -> None:
     log_section(f, "Memory")
-
-    output = safe_run(["free", "-h"])
-    f.write(output + "\n")
+    f.write(safe_run(["free", "-h"]) + "\n")
 
 
 def collect_disk_usage(f) -> None:
     log_section(f, "Disk Usage")
-
-    output = safe_run(["df", "-h"])
-    f.write(output + "\n")
+    f.write(safe_run(["df", "-h"]) + "\n")
 
 
 def collect_top_memory_processes(f, top_processes_count: int) -> None:
@@ -180,40 +185,40 @@ def collect_top_memory_processes(f, top_processes_count: int) -> None:
 
 
 def collect_systemd_failed_services(f) -> None:
+    # Skip this part if systemctl isn't available
     if shutil.which("systemctl") is None:
         return
 
     log_section(f, "Failed Systemd Services")
-    output = safe_run(["systemctl", "--failed"])
-    f.write(output + "\n")
+    f.write(safe_run(["systemctl", "--failed"]) + "\n")
 
 
 def collect_network_info(f) -> None:
     log_section(f, "Network")
 
-    # ip -brief address
+    # Basic interface info
     if shutil.which("ip"):
         f.write("Interfaces:\n")
         f.write(safe_run(["ip", "-brief", "address"]) + "\n\n")
     else:
-        f.write("Command 'ip' not found.\n\n")
+        f.write("Command 'ip' not available.\n\n")
 
-    f.write("Active connections (summary):\n")
+    f.write("Active connections:\n")
     if shutil.which("ss"):
         cmd = "ss -tulpn 2>/dev/null | head -n 20"
         f.write(safe_run_shell(cmd) + "\n")
     else:
-        f.write("Command 'ss' not found.\n")
+        f.write("Command 'ss' not available.\n")
 
 
 def cleanup_old_logs(f, log_dir: Path, retention_days: int) -> None:
     log_section(f, "Log Cleanup")
 
     f.write(f"Log retention: {retention_days} days\n")
-    f.write("Old files deleted:\n")
+    f.write("Old files removed:\n")
 
     if retention_days < 0:
-        f.write("Retention days is negative; skipping cleanup.\n")
+        f.write("Invalid retention period. Skipping.\n")
         return
 
     cutoff = datetime.now() - timedelta(days=retention_days)
@@ -227,10 +232,10 @@ def cleanup_old_logs(f, log_dir: Path, retention_days: int) -> None:
                 try:
                     file.unlink()
                 except Exception as e:
-                    f.write(f"   [ERROR deleting {file}: {e}]\n")
+                    f.write(f"   Could not delete {file}: {e}\n")
                 deleted_any = True
     except Exception as e:
-        f.write(f"[ERROR during log cleanup: {e}]\n")
+        f.write(f"Cleanup error: {e}\n")
         return
 
     if not deleted_any:
@@ -252,48 +257,49 @@ def main():
         with open(report_file, "w", encoding="utf-8") as f:
             write_header(f)
 
-            # Wrap each section in try/except so one failure doesn't kill the report
+            # Each section is wrapped to avoid breaking the whole report
             try:
                 collect_system_info(f)
             except Exception as e:
-                f.write(f"\n[ERROR in System Information]: {e}\n")
+                f.write(f"[ERROR in System Information]: {e}\n")
 
             try:
                 collect_cpu_load(f, config["TOP_PROCESSES_COUNT"])
             except Exception as e:
-                f.write(f"\n[ERROR in CPU & Load]: {e}\n")
+                f.write(f"[ERROR in CPU & Load]: {e}\n")
 
             try:
                 collect_memory(f)
             except Exception as e:
-                f.write(f"\n[ERROR in Memory]: {e}\n")
+                f.write(f"[ERROR in Memory]: {e}\n")
 
             try:
                 collect_disk_usage(f)
             except Exception as e:
-                f.write(f"\n[ERROR in Disk Usage]: {e}\n")
+                f.write(f"[ERROR in Disk Usage]: {e}\n")
 
             try:
                 collect_top_memory_processes(f, config["TOP_PROCESSES_COUNT"])
             except Exception as e:
-                f.write(f"\n[ERROR in Top Processes by Memory]: {e}\n")
+                f.write(f"[ERROR in Top Processes by Memory]: {e}\n")
 
             try:
                 collect_systemd_failed_services(f)
             except Exception as e:
-                f.write(f"\n[ERROR in Failed Systemd Services]: {e}\n")
+                f.write(f"[ERROR in Failed Systemd Services]: {e}\n")
 
             try:
                 collect_network_info(f)
             except Exception as e:
-                f.write(f"\n[ERROR in Network]: {e}\n")
+                f.write(f"[ERROR in Network]: {e}\n")
 
             try:
                 cleanup_old_logs(f, log_dir, config["LOG_RETENTION_DAYS"])
             except Exception as e:
-                f.write(f"\n[ERROR in Log Cleanup]: {e}\n")
+                f.write(f"[ERROR in Log Cleanup]: {e}\n")
 
         print(f"[INFO] Report generation finished: {report_file}")
+
     except Exception as e:
         print(f"[FATAL] Could not write report file: {e}")
         sys.exit(1)
