@@ -1,0 +1,52 @@
+System Health Report - 2025-11-23 19:08:26
+----------------------------------------
+
+==================== System Information ====================
+
+Hostname: Yassin
+Uptime:   [ERROR running 'uptime -p']: [WinError 2] The system cannot find the file specified
+Kernel:   3.5.7-463ebcdc.x86_64
+OS:       Unknown OS
+
+==================== CPU & Load ====================
+
+Load average (1, 5, 15 min): [ERROR reading /proc/loadavg: [Errno 2] No such file or directory: '/proc/loadavg']
+
+Top 5 processes by CPU:
+PID COMMAND         %CPU %MEM
+    152 snapfuse        71.7  0.0
+    843 bash            33.3  0.0
+    381 dockerd         13.7  0.5
+    833 journalctl       9.5  0.2
+      1 systemd          9.0  0.0
+
+==================== Memory ====================
+
+[ERROR running 'free -h']: [WinError 2] The system cannot find the file specified
+
+==================== Disk Usage ====================
+
+Filesystem            Size  Used Avail Use% Mounted on
+C:/Program Files/Git  476G  470G  6.7G  99% /
+
+==================== Top Processes by Memory ====================
+
+PID COMMAND         %CPU %MEM
+    381 dockerd         12.3  0.5
+    310 containerd       4.5  0.3
+    265 snapd            8.1  0.2
+    316 unattended-upgr  3.0  0.1
+    932 check-new-relea 50.0  0.1
+
+==================== Network ====================
+
+Command 'ip' not found.
+
+Active connections (summary):
+Command 'ss' not found.
+
+==================== Log Cleanup ====================
+
+Log retention: 7 days
+Old files deleted:
+ - None
