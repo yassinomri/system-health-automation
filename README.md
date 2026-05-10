@@ -40,6 +40,20 @@ system-health-automation/
 
 ---
 
+## ⚡ Quick Start
+
+```bash
+# Clone and setup
+git clone https://github.com/yassinomri/system-health-automation.git
+cd system-health-automation
+
+# Run once
+python3 system_health.py
+
+# Check the generated report
+cat logs/system_health_*.log
+```
+
 ## ⚙️ Configuration
 
 The script reads settings from **config.env**:
@@ -78,6 +92,32 @@ python3 system_health.py
 
 ---
 
+## 📋 Sample Output
+
+```
+=== SYSTEM HEALTH REPORT ===
+Generated: 2026-05-10 14:23:45
+
+🖥️  SYSTEM INFO
+Hostname: server-01
+OS: Ubuntu 22.04 LTS
+Kernel: 5.15.0-105-generic
+Uptime: 45 days, 3 hours
+
+💻 CPU
+Load Average: 0.45, 0.38, 0.42
+Top Processes:
+  - python3 (12.5%)
+  - node (8.3%)
+  ...
+```
+
+## 🛡️ Error Handling
+
+- Script gracefully handles missing systemd on systems that don't have it
+- Logs are created even if some metrics fail to collect
+- Configuration file is optional (uses defaults if missing)
+
 ## 🕒 Optional: Automate with Cron
 
 To run the script automatically (e.g., every hour):
@@ -104,6 +144,14 @@ Example:
 Set `LOG_RETENTION_DAYS=3` → only keep the last 3 days of reports.
 
 ---
+
+## 💡 Use Cases
+
+- **Server Monitoring**: Run hourly on production servers
+- **Troubleshooting**: Quick health snapshot when performance degrades
+- **Capacity Planning**: Track trends over time
+- **Automation Learning**: Study how to work with system calls in Python
+
 
 ## 📦 Requirements
 
